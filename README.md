@@ -78,6 +78,24 @@ maw brain search "ANE power" --json                         # for scripts and ag
 - Only the hits' text is read.
 - An agent can call `maw brain search "<task>" --md` before it starts work, to pull in what the folders already know.
 
+### The brain as an Obsidian vault: `wiki`
+
+```
+maw brain wiki                                   # inside a project: writes .brain/wiki/ (gitignored)
+maw brain wiki notes.brain --out=~/vaults/notes  # any brain, any folder
+maw brain wiki --summarize                       # a model writes 3-5 sentences on top of each topic page
+open "obsidian://open?path=$HOME/vaults/notes"   # or Obsidian: Open folder as vault
+```
+
+- `index.md`, then one page per topic (`topics/`), room (`rooms/`) and month (`timeline/`), each with YAML frontmatter and `[[wikilinks]]`.
+- Relations come from the vectors, not from tags you write:
+  - related topics = the map's nearest-neighbour links that cross between two topics, plus the cosine of their centroids;
+  - every chunk links its room, its topic and its month, so Obsidian's graph and backlinks show the brain's shape.
+- Topic keywords (c-TF-IDF) become tags (`kw/<word>`), and pages are tagged `brain/topic`, `brain/room`, `brain/month`.
+- `--chunks=40` sets how many chunks a page shows. A rebuild rewrites the pages and removes ones that no longer exist.
+- `--summarize[="claude -p --model sonnet"]` sends each topic page's text to that command (any CLI that reads stdin).
+  Summaries are cached by the page's chunk ids, so after a rebuild only changed topics are asked again. `--summarize-all` does rooms and months too.
+
 You can also get a JSONL file from git history:
 
 ```
@@ -99,6 +117,7 @@ maw brain build commits.jsonl && maw brain serve commits.brain
 | `reload [--port]` | Makes a running page re-read its folder after a rebuild. |
 | `search <question> [--all] [--project] [--md\|--json]` | Searches by meaning from anywhere: this project's `.brain`, or every project. `--md` gives LLM-ready context. |
 | `ls [--json]` | Lists every project with its points, last build and port. |
+| `wiki [brain dir] [--out] [--summarize]` | Writes the brain as an Obsidian vault: topics, rooms and months as linked markdown pages. |
 | `check` | Checks for uv, python3 and the embed server, and prints the vector size. |
 
 ### Inputs
@@ -156,6 +175,7 @@ Needs [uv](https://docs.astral.sh/uv/), which brings Python 3.12, numpy, umap-le
 - `serve` binds `127.0.0.1` by default, and otherwise only a tailscale `100.64.0.0/10` address. It refuses `0.0.0.0` and public addresses.
 - Source folders and brain folders hold your text. The `.gitignore` here keeps `*.brain/`, `*.source/` and `server.sqlite` out of git; do the same in your own repos.
 - Commands print counts and timings, never your text.
+- `wiki` writes your text into markdown pages: the vault is as private as the brain. `--summarize` sends page text to the command you name; without it nothing leaves the machine.
 - The page loads three.js from a CDN. Your data is served only by your own machine.
 
 ## Notes
