@@ -62,6 +62,22 @@ maw brain build --all                            # rebuild every project, one af
 - **`.brain/.gitignore`:** keeps everything in `.brain/` out of git except `brain.json`. You can commit the recipe, but not the text.
 - **The project list:** kept in `~/.maw/brain/registry.json`.
 
+### One global command, each `.brain` as context: `search`
+
+`maw brain` is installed once, and every project keeps its own `.brain`. `search` reads them directly, with no server running:
+
+```
+cd ~/notes && maw brain search "why did the build fail"     # inside a project: only its .brain
+maw brain search "ANE power" --all                          # anywhere: every project in maw brain ls, hits merged by meaning
+maw brain search "ANE power" --project=notes,books --k=5    # only these projects
+maw brain search "ANE power" --md > context.md              # LLM-ready context: full chunk text, --chars=6000 budget
+maw brain search "ANE power" --json                         # for scripts and agents
+```
+
+- The question is embedded once for each embed server and model, then scored against each brain's `vec.i8`. This is the same math as the page's search.
+- Only the hits' text is read.
+- An agent can call `maw brain search "<task>" --md` before it starts work, to pull in what the folders already know.
+
 You can also get a JSONL file from git history:
 
 ```
@@ -81,6 +97,7 @@ maw brain build commits.jsonl && maw brain serve commits.brain
 | `from <jsonl\|md\|dyi\|fbposts> <input>` | Makes only the source folder (`server.json` + `server.sqlite`), so you can check it before building. |
 | `insight <brain dir>` | Finds topics (HDBSCAN + c-TF-IDF, Thai words via PyThaiNLP) and the island layout. `build` already runs it. |
 | `reload [--port]` | Makes a running page re-read its folder after a rebuild. |
+| `search <question> [--all] [--project] [--md\|--json]` | Searches by meaning from anywhere: this project's `.brain`, or every project. `--md` gives LLM-ready context. |
 | `ls [--json]` | Lists every project with its points, last build and port. |
 | `check` | Checks for uv, python3 and the embed server, and prints the vector size. |
 
