@@ -28,6 +28,40 @@ maw brain serve notes.brain --port=7720          # http://127.0.0.1:7720/brain/
 maw brain build notes.jsonl && maw brain reload  # rebuild; the running page re-reads it
 ```
 
+### A brain in any folder: `init`
+
+`init` turns any folder into a brain project, much like `git init`. After that, `build` and `serve` need no arguments, from that folder or any folder below it:
+
+```
+cd ~/notes && maw brain init --name="my notes" --exclude=drafts
+maw brain build                                  # reads .brain/brain.json, writes the brain into .brain/
+maw brain serve                                  # on the project's own port (7740, 7741, ... one per project)
+maw brain ls                                     # every project: name, kind, points, last build, port
+maw brain build --all                            # rebuild every project, one after another
+```
+
+`.brain/brain.json` holds the metadata. Edit it by hand or with `init --force`:
+
+```json
+{
+  "name": "ane-commits",
+  "created": "2026-11-27T08:29:26.731Z",
+  "inputs": ["commits.jsonl"],
+  "kind": "jsonl",
+  "exclude": [],
+  "embed": {},
+  "serve": { "host": "127.0.0.1", "port": 7740 },
+  "last_build": { "built": "2026-11-27T15:30:09+0700", "points": 192, "rooms": 66, "total_seconds": 41.6 }
+}
+```
+
+(The real file from `init --input=commits.jsonl`; `last_build` is trimmed here, while the file keeps every count.)
+
+- **`inputs`:** paths relative to the folder. Several inputs make one map.
+- **`kind`, `gap`, `exclude`, `embed`:** the same as the build flags. A flag given on the command line wins.
+- **`.brain/.gitignore`:** keeps everything in `.brain/` out of git except `brain.json`. You can commit the recipe, but not the text.
+- **The project list:** kept in `~/.maw/brain/registry.json`.
+
 You can also get a JSONL file from git history:
 
 ```
@@ -41,11 +75,13 @@ maw brain build commits.jsonl && maw brain serve commits.brain
 
 | Command | What it does |
 |---|---|
-| `build <input>... [--out=DIR]` | Turns the input into a source folder, then chunks, vectors (cached), UMAP 3D, 4 nearest links and topics. Several inputs make one map. |
-| `serve <brain dir> [--port] [--host]` | Serves the three.js page: search by meaning and by words, click a point to read it, Combined or Separate layout, the time machine, and lightning on replay. |
+| `init [dir]` | Makes a folder a brain project (`.brain/brain.json`: name, inputs, kind, gap, exclude, embed, port). |
+| `build [input...] [--out=DIR] [--all]` | With no input it builds the project here, and with `--all` every project. Otherwise it turns the input into a source folder, then chunks, vectors (cached), UMAP 3D, 4 nearest links and topics. Several inputs make one map. |
+| `serve [brain dir] [--port] [--host]` | With no argument it serves the project here on its port. Otherwise it serves the three.js page: search by meaning and by words, click a point to read it, Combined or Separate layout, the time machine, and lightning on replay. |
 | `from <jsonl\|md\|dyi\|fbposts> <input>` | Makes only the source folder (`server.json` + `server.sqlite`), so you can check it before building. |
 | `insight <brain dir>` | Finds topics (HDBSCAN + c-TF-IDF, Thai words via PyThaiNLP) and the island layout. `build` already runs it. |
 | `reload [--port]` | Makes a running page re-read its folder after a rebuild. |
+| `ls [--json]` | Lists every project with its points, last build and port. |
 | `check` | Checks for uv, python3 and the embed server, and prints the vector size. |
 
 ### Inputs
@@ -94,6 +130,7 @@ The vectors are cached per chunk in `<brain>/cache/`, so a rebuild only embeds n
 | `BRAIN_EMBED_URL` | `http://127.0.0.1:11445` | Ollama-style embed server (`POST /api/embed`); `--url=` per run |
 | `BRAIN_EMBED_MODEL` | `embeddinggemma:ane-w8a16` | model name sent to it; `--model=` per run |
 | `ATLAS_EMBED_URL` / `ATLAS_EMBED_MODEL` | | read too, so a maw-atlas setup works unchanged |
+| `MAW_BRAIN_REGISTRY` | `~/.maw/brain/registry.json` | where `init` lists projects |
 
 Needs [uv](https://docs.astral.sh/uv/), which brings Python 3.12, numpy, umap-learn, scikit-learn and pythainlp for the engine. The converters only need the Python standard library.
 
