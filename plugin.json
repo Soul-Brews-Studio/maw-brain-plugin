@@ -1,0 +1,17 @@
+{
+  "name": "brain",
+  "version": "26.11.27-1",
+  "entry": "./index.ts",
+  "sdk": "^1.0.0",
+  "description": "Any text as a 3D meaning map: JSONL, markdown folders, a Facebook export or a Discord download -> chunks, EmbeddingGemma vectors (Chippy on the Apple Neural Engine, or Ollama), UMAP 3D, topics, time machine. Local only.",
+  "author": "ane-oracle (Soul Brews Studio)",
+  "capabilities": ["fs:read", "fs:write", "proc:exec", "net:fetch"],
+  "cli": {
+    "command": "brain",
+    "help": "maw brain <from|build|serve|insight|reload|check> — any text as a 3D meaning map (local only)"
+  },
+  "weight": 50,
+  "runtime": "bun-dev",
+  "license": "MIT",
+  "schemaVersion": 1
+}

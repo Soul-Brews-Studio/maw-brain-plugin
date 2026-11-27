@@ -1,0 +1,126 @@
+import { Database } from "bun:sqlite";
+import { afterAll, describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import handler from "../index";
+import { defaultOut, detectKind } from "../lib/run";
+
+const root = mkdtempSync(join(tmpdir(), "maw-brain-src-"));
+afterAll(() => rmSync(root, { recursive: true, force: true }));
+const py = (args: string[]) => Bun.spawnSync(["python3", "-I", join(import.meta.dir, "..", "scripts", "brain-source.py"), ...args]);
+const rows = (dir: string) => {
+  const db = new Database(join(dir, "server.sqlite"), { readonly: true });
+  const r = { rooms: db.query("select id, name from channels order by id").all() as any[],
+    msgs: db.query("select channel_id, ts, author_name, content from discord_messages order by id").all() as any[] };
+  db.close();
+  return r;
+};
+
+describe("jsonl", () => {
+  const f = join(root, "notes.jsonl");
+  writeFileSync(f, [
+    JSON.stringify({ text: "first note about beer", ts: "2026-11-01T10:00:00Z", group: "beer", title: "Beer" }),
+    JSON.stringify({ text: "second, unix seconds", ts: 1762000000, group: "beer" }),
+    JSON.stringify({ text: "third, unix ms, no group", ts: 1762000000000 }),
+    "not json",
+    JSON.stringify({ text: "" }),
+    JSON.stringify({ text: "no ts keeps its order" }),
+  ].join("\n"));
+  const out = join(root, "notes.source");
+  test("rows, rooms, times, the gap for documents", () => {
+    const p = py(["jsonl", f, out]);
+    expect(p.exitCode).toBe(0);
+    expect(p.stdout.toString()).toContain("skipped 2 lines");
+    const r = rows(out);
+    expect(r.rooms.map(x => x.id)).toEqual(["all", "beer"]);
+    expect(r.msgs).toHaveLength(4);
+    expect(r.msgs[0].content).toBe("Beer\nfirst note about beer");
+    expect(r.msgs[0].ts).toStartWith("2026-11-01T10:00:00");
+    expect(r.msgs[1].ts).toBe(r.msgs[2].ts); // seconds and ms read the same
+    expect(JSON.parse(readFileSync(join(out, "server.json"), "utf8"))).toMatchObject({ guild: { name: "notes" }, brain: { kind: "jsonl", gap: 0.0001 } });
+  });
+  test("printed counts carry no text", () => expect(py(["jsonl", f, out]).stdout.toString()).not.toContain("beer"));
+});
+
+describe("markdown folder", () => {
+  const md = join(root, "lib");
+  mkdirSync(join(md, "book-a"), { recursive: true });
+  mkdirSync(join(md, "node_modules", "x"), { recursive: true });
+  writeFileSync(join(md, "book-a", "01-intro.md"), "---\ndate: 2025-05-05\n---\n# Intro\nThis section is long enough to keep, forty characters at least.\n```\ncode is dropped\n```\n![img](x.png)\n## Two\nshort\n## Three\nAnother section that is long enough to be one point on the map.\n");
+  writeFileSync(join(md, "top.md"), "Root file without heading but long enough to count as a section here.\n");
+  writeFileSync(join(md, "node_modules", "x", "README.md"), "# skipped\nnode_modules is never read, even when it is long enough.\n");
+  test("sections by heading, rooms by folder, code and images dropped", () => {
+    const out = join(root, "lib.source");
+    expect(py(["md", md, out]).exitCode).toBe(0);
+    const r = rows(out);
+    expect(r.rooms.map(x => x.id).sort()).toEqual(["book-a", "lib"]);
+    expect(r.msgs).toHaveLength(3);
+    const text = r.msgs.map(m => m.content).join("\n");
+    expect(text).not.toContain("code is dropped");
+    expect(text).not.toContain("img");
+    expect(text).not.toContain("node_modules");
+    const intro = r.msgs.find(m => m.content.startsWith("Intro"));
+    expect(intro.ts).toStartWith("2025-05-05");
+  });
+  test("--group file: one room per file", () => {
+    const out = join(root, "lib-file.source");
+    expect(py(["md", md, out, "--group", "file"]).exitCode).toBe(0);
+    expect(rows(out).rooms.map(x => x.id).sort()).toEqual(["book-a/01-intro.md", "top.md"]);
+  });
+});
+
+describe("Facebook export", () => {
+  const fb = join(root, "fb");
+  const t = join(fb, "your_facebook_activity", "messages", "inbox", "friend_123");
+  mkdirSync(t, { recursive: true });
+  const latin1 = (s: string) => Buffer.from(s, "utf8").toString("latin1"); // how Facebook writes UTF-8
+  writeFileSync(join(t, "message_1.json"), JSON.stringify({ title: latin1("เพื่อน"), messages: [
+    { sender_name: "A", timestamp_ms: 1700000000000, content: latin1("สวัสดีครับ") },
+    { sender_name: "B", timestamp_ms: 1700000060000, content: "hi" },
+    { sender_name: "B", timestamp_ms: 1700000120000, photos: [{}] },
+  ] }));
+  test("Thai repaired, only text kept, chat gap", () => {
+    const out = join(root, "fb.source");
+    expect(py(["dyi", fb, out, "--min-messages", "2"]).exitCode).toBe(0);
+    const r = rows(out);
+    expect(r.rooms[0].name).toBe("เพื่อน");
+    expect(r.msgs.map(m => m.content)).toEqual(["สวัสดีครับ", "hi"]);
+    expect(JSON.parse(readFileSync(join(out, "server.json"), "utf8")).brain.gap).toBe(3);
+  });
+  test("threads under --min-messages are left out", () => {
+    const out = join(root, "fb5.source");
+    py(["dyi", fb, out]);
+    expect(rows(out).msgs).toHaveLength(0);
+  });
+});
+
+describe("detect + defaults", () => {
+  test("kinds", () => {
+    expect(detectKind(join(root, "notes.jsonl"))).toBe("jsonl");
+    expect(detectKind(join(root, "notes.source"))).toBe("source");
+    expect(detectKind(join(root, "fb"))).toBe("dyi");
+    expect(detectKind(join(root, "lib"))).toBe("md");
+    expect(detectKind(join(root, "nope"))).toBeNull();
+  });
+  test("out next to the input, never inside a markdown folder", () => {
+    expect(defaultOut(join(root, "notes.jsonl"), "jsonl")).toBe(join(root, "notes.brain"));
+    expect(defaultOut(join(root, "lib"), "md")).toBe(join(root, "lib.brain"));
+    expect(defaultOut(join(root, "notes.source"), "source")).toBe(join(root, "notes.source", "brain"));
+  });
+});
+
+describe("cli", () => {
+  test("help lists every command", async () => {
+    const r = await handler({ source: "cli", args: ["--help"] });
+    expect(r.ok).toBe(true);
+    for (const c of ["build", "serve", "from", "insight", "reload", "check"]) expect(r.output).toContain(`  ${c} `);
+  });
+  test("unknown command fails", async () => expect((await handler({ source: "cli", args: ["nope"] })).ok).toBe(false));
+  test("from writes a source folder", async () => {
+    const out = join(root, "cli.source");
+    const r = await handler({ source: "cli", args: ["from", "jsonl", join(root, "notes.jsonl"), `--out=${out}`] });
+    expect(r.ok).toBe(true);
+    expect(rows(out).msgs).toHaveLength(4);
+  });
+});

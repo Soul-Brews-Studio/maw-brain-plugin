@@ -1,0 +1,10 @@
+# brains and sources hold your text: never commit them
+*.brain/
+*.source/
+brain/
+server.sqlite
+cache/
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
