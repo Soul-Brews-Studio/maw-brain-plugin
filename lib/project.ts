@@ -20,7 +20,7 @@ export interface BrainConfig {
   last_build?: Record<string, unknown>;
 }
 
-export const REGISTRY = process.env.MAW_BRAIN_REGISTRY || join(homedir(), ".maw", "brain", "registry.json");
+export const registryPath = () => process.env.MAW_BRAIN_REGISTRY || join(homedir(), ".maw", "brain", "registry.json");
 export const cfgPath = (dir: string) => join(dir, ".brain", "brain.json");
 
 /** nearest folder (this one or a parent) with .brain/brain.json */
@@ -38,12 +38,12 @@ export const readConfig = (dir: string): BrainConfig => JSON.parse(readFileSync(
 export const writeConfig = (dir: string, c: BrainConfig) => writeFileSync(cfgPath(dir), JSON.stringify(c, null, 2) + "\n");
 
 export function registry(): string[] {
-  try { return JSON.parse(readFileSync(REGISTRY, "utf8")).projects ?? []; } catch { return []; }
+  try { return JSON.parse(readFileSync(registryPath(), "utf8")).projects ?? []; } catch { return []; }
 }
 export function register(dir: string) {
   const all = [...new Set([...registry().filter(p => existsSync(cfgPath(p))), resolve(dir)])].sort();
-  mkdirSync(dirname(REGISTRY), { recursive: true });
-  writeFileSync(REGISTRY, JSON.stringify({ projects: all }, null, 2) + "\n");
+  mkdirSync(dirname(registryPath()), { recursive: true });
+  writeFileSync(registryPath(), JSON.stringify({ projects: all }, null, 2) + "\n");
 }
 
 /** a free-looking default port per project: 7740 + the number of projects already registered */
