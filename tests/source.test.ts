@@ -103,19 +103,19 @@ describe("Facebook timeline (fbposts)", () => {
   mkdirSync(join(act, "groups"), { recursive: true });
   const latin1 = (s: string) => Buffer.from(s, "utf8").toString("latin1");
   writeFileSync(join(act, "posts", "your_posts__check_ins__photos_and_videos_1.json"), JSON.stringify([
-    { timestamp: 1700000000, data: [{ post: latin1("fake post one") }] },
+    { timestamp: 1700000000, data: [{ post: latin1("โพสต์หนึ่ง") }] },
     { timestamp: 1699999999, data: [{ update_timestamp: 1699999999 }] }, // no post text: skipped
   ]));
   writeFileSync(join(act, "comments_and_reactions", "comments.json"), JSON.stringify({ comments_v2: [
-    { data: [{ comment: { timestamp: 1700000100, comment: latin1("fake comment") } }] },
+    { data: [{ comment: { timestamp: 1700000100, comment: latin1("คอมเมนต์หนึ่ง") } }] },
   ] }));
   writeFileSync(join(act, "groups", "group_posts_and_comments.json"), JSON.stringify({ group_posts_v2: [
-    { timestamp: 1700000200, data: [{ post: latin1("fake group post") }] },
+    { timestamp: 1700000200, data: [{ post: latin1("โพสต์ในกลุ่ม") }] },
   ] }));
   writeFileSync(join(act, "groups", "your_comments_in_groups.json"), JSON.stringify({ comments_v2: [
-    { data: [{ comment: { timestamp: 1700000300, comment: latin1("fake group comment") } }] },
+    { data: [{ comment: { timestamp: 1700000300, comment: latin1("คอมเมนต์ในกลุ่ม") } }] },
   ] }));
-  test("one point per post/comment, Thai-style Latin-1 repair, gap for documents", () => {
+  test("one point per post/comment, Thai Latin-1 repair, gap for documents", () => {
     const out = join(root, "fbtl.source");
     const p = py(["fbposts", fb, out]);
     expect(p.exitCode).toBe(0);
@@ -123,7 +123,7 @@ describe("Facebook timeline (fbposts)", () => {
     const r = rows(out);
     expect(r.rooms.map(x => x.id).sort()).toEqual(["comments", "group_comments", "group_posts", "posts"]);
     expect(r.msgs).toHaveLength(4);
-    expect(r.msgs.map(m => m.content).sort()).toEqual(["fake comment", "fake group comment", "fake group post", "fake post one"]);
+    expect(r.msgs.map(m => m.content).sort()).toEqual(["คอมเมนต์หนึ่ง", "คอมเมนต์ในกลุ่ม", "โพสต์หนึ่ง", "โพสต์ในกลุ่ม"]);
     expect(JSON.parse(readFileSync(join(out, "server.json"), "utf8")).brain.gap).toBe(0.0001);
   });
   test("--since drops earlier posts", () => {
@@ -131,7 +131,7 @@ describe("Facebook timeline (fbposts)", () => {
     py(["fbposts", fb, out, "--since", "2024-01-01"]);
     expect(rows(out).msgs.length).toBeLessThan(4);
   });
-  test("printed counts carry no text", () => expect(py(["fbposts", fb, join(root, "fbtl.source")]).stdout.toString()).not.toContain("fake"));
+  test("printed counts carry no text", () => expect(py(["fbposts", fb, join(root, "fbtl.source")]).stdout.toString()).not.toContain("โพสต์"));
 });
 
 describe("detect + defaults", () => {
