@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """brain-engine.py: the build engine of `maw brain` (run through uv). Vendored from nat-build-with-oracle/maw-atlas
-scripts/atlas-brain.py (MIT) at 536313bf; changes: message_text() inlined (was atlas-lance.py), messages point at
+scripts/atlas-brain.py (MIT) at 536313bf, page re-synced at e1cfae6; changes: message_text() inlined (was atlas-lance.py), messages point at
 `maw brain`. Input is any "source folder" (server.json + server.sqlite, the maw atlas download layout); the
 converters in brain-source.py make one from JSONL, markdown or a Facebook export.
 
