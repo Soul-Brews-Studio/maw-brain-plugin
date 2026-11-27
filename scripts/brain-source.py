@@ -175,7 +175,7 @@ def sections(text, cap):
 def from_md(a):
     root = Path(a.input).expanduser().resolve()
     src = Source(a.out, a.name or root.name, "md", 0.0001)
-    skip = {".git", "node_modules", ".venv", "dist", "build"}
+    skip = {".git", ".brain", "node_modules", ".venv", "dist", "build", "wt"} | {x.strip() for x in a.exclude.split(",") if x.strip()}
     files = sorted(p for p in root.rglob("*.md") if not skip & set(p.relative_to(root).parts))
     last = {}   # room -> last time used: files committed together share t0, so sections must not interleave
     for f in files:
@@ -343,6 +343,7 @@ def main(argv=None):
         if k == "md":
             p.add_argument("--group", choices=["dir", "file"], default="dir")
             p.add_argument("--chars", type=int, default=1200)
+            p.add_argument("--exclude", default="", help="more folder names to skip, comma separated")
         if k == "dyi":
             p.add_argument("--since", default="")
             p.add_argument("--min-messages", type=int, default=5)

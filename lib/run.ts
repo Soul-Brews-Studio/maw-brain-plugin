@@ -84,7 +84,7 @@ export function sourceCmd(rest: string[]): string[] {
 }
 
 export async function convert(kind: Exclude<Kind, "source">, input: string, out: string, args: string[], log: Log) {
-  const allow: Record<string, string[]> = { jsonl: ["name"], md: ["name", "group", "chars"], dyi: ["name", "since", "min-messages", "sources"], fbposts: ["name", "since"] };
+  const allow: Record<string, string[]> = { jsonl: ["name"], md: ["name", "group", "chars", "exclude"], dyi: ["name", "since", "min-messages", "sources"], fbposts: ["name", "since"] };
   const pass: string[] = [];
   for (const k of allow[kind]) { const v = flag(args, k); if (v !== undefined) pass.push(`--${k}`, v); }
   await runLive(sourceCmd([kind, resolve(input), resolve(out), ...pass]), log, "brain-source.py");
