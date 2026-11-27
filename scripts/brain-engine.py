@@ -369,6 +369,28 @@ def insight(out):
 
     mcs = max(8, n // 80)
     labels = HDBSCAN(min_cluster_size=mcs, min_samples=max(3, mcs // 3)).fit_predict(xyz)
+    # one dense map (e.g. 53 Thai books on one subject) can come out as ONE giant 'excess of mass' cluster
+    # (8,266 of 8,884 chunks, 2026-11-27). Then take HDBSCAN's leaf clusters, and give each unlabelled chunk the
+    # topic most of its nearest neighbours in meaning (knn.u32) have, a few rounds, so the leaves cover the map.
+    method = "eom"
+    big = np.bincount(labels[labels >= 0]).max() if (labels >= 0).any() else 0
+    if big > 0.5 * n:
+        method = "leaf + knn fill"
+        labels = HDBSCAN(min_cluster_size=mcs, min_samples=max(3, mcs // 3), cluster_selection_method="leaf").fit_predict(xyz)
+        if (out / "knn.u32").exists():
+            knn = np.fromfile(out / "knn.u32", np.uint32).reshape(n, -1)
+            for _ in range(10):
+                todo = np.where(labels < 0)[0]
+                if not len(todo):
+                    break
+                changed = 0
+                for i in todo:
+                    nb = labels[knn[i][knn[i] < n]]
+                    nb = nb[nb >= 0]
+                    if len(nb):
+                        labels[i] = np.bincount(nb).argmax(); changed += 1
+                if not changed:
+                    break
     topics_ids = sorted(set(labels.tolist()) - {-1}, key=lambda t: -(labels == t).sum())
     remap = {t: i for i, t in enumerate(topics_ids)}
     topic = np.array([remap.get(int(l), 65535) for l in labels], np.uint16)
@@ -431,7 +453,7 @@ def insight(out):
             "top_bots": bots.most_common(5),
             "bot_message_share": round(sum(bots.values()) / max(1, sum(bots.values()) + sum(authors.values())), 3),
             "topics": len(topics), "noise_chunks": int((topic == 65535).sum()),
-            "clustering": {"method": "HDBSCAN on the 3D map", "min_cluster_size": mcs},
+            "clustering": {"method": f"HDBSCAN on the 3D map ({method})", "min_cluster_size": mcs},
             "keywords": "c-TF-IDF over PyThaiNLP newmm + latin words, stopwords removed"}
     (out / "insight.json").write_text(json.dumps({"overview": over, "topics": topics}, ensure_ascii=False, separators=(",", ":")))
     say(f"insight: {len(topics)} topics (HDBSCAN min_cluster_size {mcs}), {over['noise_chunks']} chunks in no topic, "
