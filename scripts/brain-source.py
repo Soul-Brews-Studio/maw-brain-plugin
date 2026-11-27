@@ -6,6 +6,7 @@ scripts/brain-engine.py builds a 3D meaning map from. Standard library only; not
   brain-source.py md    <folder> <out dir> [--name N] [--group dir|file] [--chars 1200]
   brain-source.py dyi   <Facebook export root> <out dir> [--name N] [--since YYYY-MM-DD] [--min-messages 5]
                         [--sources inbox,archived_threads,e2ee_cutover]
+  brain-source.py fbposts <Facebook export root> <out dir> [--name N] [--since YYYY-MM-DD]
 
 What a source folder holds (the same tables `maw atlas download` writes, so Discord downloads build as they are):
   server.json    {"guild": {"name", "id"}, "brain": {"kind", "gap"}}   brain.gap = the --gap hours build should use
@@ -24,6 +25,8 @@ md: every *.md under the folder; a heading (#..####) starts a section; code bloc
 dyi: Facebook "Download Your Information" JSON, Messenger threads. Strings are repaired from Facebook's Latin-1
   escaping (s.encode("latin-1").decode("utf-8")); only text messages are kept. gap 3: messages merge into
   conversations.
+fbposts: your own posts, comments and group posts from the same DYI export (posts/, comments_and_reactions/,
+  groups/) — timeline, not Messenger. One point per post/comment (gap 0.0001); same Latin-1 repair.
 
 Prints counts only, never the text.
 """
@@ -240,10 +243,99 @@ def from_dyi(a):
     print(f"{threads:,} threads read, {kept:,} kept (>= {a.min_messages} text messages), {skipped:,} skipped")
 
 
+# ── Facebook DYI (timeline: posts, comments, group posts) ──────────────────
+
+def find_activity(root):
+    for p in (root, root / "your_facebook_activity"):
+        if (p / "posts").is_dir() or (p / "comments_and_reactions").is_dir() or (p / "groups").is_dir():
+            return p
+    sys.exit(f"no posts/comments_and_reactions/groups under {root}")
+
+
+def glob_json(d, pattern):
+    return sorted(d.glob(pattern)) if d.is_dir() else []
+
+
+def post_texts(item):
+    """one Facebook "post" dict -> text items: data[].post, plus any attachment media description."""
+    out = []
+    for d in item.get("data", []):
+        if isinstance(d, dict) and d.get("post"):
+            out.append(fix(d["post"]))
+    for att in item.get("attachments", []):
+        for d in att.get("data", []):
+            media = d.get("media") if isinstance(d, dict) else None
+            if media and media.get("description"):
+                out.append(fix(media["description"]))
+    return out
+
+
+def from_fbposts(a):
+    root = find_activity(Path(a.input).expanduser())
+    since = to_unix(a.since) if a.since else 0
+    src = Source(a.out, a.name or "Timeline", "fbposts", 0.0001)
+    counts = {"posts": 0, "group_posts": 0, "comments": 0, "group_comments": 0, "skipped": 0}
+
+    for f in glob_json(root / "posts", "your_posts__*.json") or glob_json(root / "posts", "your_posts_*.json"):
+        for item in json.loads(f.read_text(encoding="utf-8")):
+            t = item.get("timestamp", 0)
+            if t < since:
+                counts["skipped"] += 1
+                continue
+            for text in post_texts(item):
+                if text:
+                    src.add(src.room("posts", "Your posts"), t, text)
+                    counts["posts"] += 1
+
+    gf = root / "groups" / "group_posts_and_comments.json"
+    if gf.is_file():
+        for item in json.loads(gf.read_text(encoding="utf-8")).get("group_posts_v2", []):
+            t = item.get("timestamp", 0)
+            if t < since:
+                counts["skipped"] += 1
+                continue
+            for text in post_texts(item):
+                if text:
+                    src.add(src.room("group_posts", "Group posts"), t, text)
+                    counts["group_posts"] += 1
+
+    cf = root / "comments_and_reactions" / "comments.json"
+    if cf.is_file():
+        for item in json.loads(cf.read_text(encoding="utf-8")).get("comments_v2", []):
+            for d in item.get("data", []):
+                c = d.get("comment") if isinstance(d, dict) else None
+                if not c:
+                    continue
+                t, text = c.get("timestamp", 0), fix(c.get("comment"))
+                if t < since or not text:
+                    counts["skipped"] += 1
+                    continue
+                src.add(src.room("comments", "Your comments"), t, text)
+                counts["comments"] += 1
+
+    cgf = root / "groups" / "your_comments_in_groups.json"
+    if cgf.is_file():
+        for item in json.loads(cgf.read_text(encoding="utf-8")).get("comments_v2", []):
+            for d in item.get("data", []):
+                c = d.get("comment") if isinstance(d, dict) else None
+                if not c:
+                    continue
+                t, text = c.get("timestamp", 0), fix(c.get("comment"))
+                if t < since or not text:
+                    counts["skipped"] += 1
+                    continue
+                src.add(src.room("group_comments", "Group comments"), t, text)
+                counts["group_comments"] += 1
+
+    src.close()
+    print(f"{counts['posts']:,} posts, {counts['group_posts']:,} group posts, {counts['comments']:,} comments, "
+          f"{counts['group_comments']:,} group comments, {counts['skipped']:,} skipped (before --since, or no text)")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="kind", required=True)
-    for k in ("jsonl", "md", "dyi"):
+    for k in ("jsonl", "md", "dyi", "fbposts"):
         p = sub.add_parser(k)
         p.add_argument("input")
         p.add_argument("out")
@@ -255,8 +347,10 @@ def main(argv=None):
             p.add_argument("--since", default="")
             p.add_argument("--min-messages", type=int, default=5)
             p.add_argument("--sources", default="inbox,archived_threads,e2ee_cutover")
+        if k == "fbposts":
+            p.add_argument("--since", default="")
     a = ap.parse_args(argv)
-    {"jsonl": from_jsonl, "md": from_md, "dyi": from_dyi}[a.kind](a)
+    {"jsonl": from_jsonl, "md": from_md, "dyi": from_dyi, "fbposts": from_fbposts}[a.kind](a)
 
 
 if __name__ == "__main__":

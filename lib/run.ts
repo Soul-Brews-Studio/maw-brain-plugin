@@ -10,7 +10,7 @@ export const SCRIPTS = join(import.meta.dir, "..", "scripts");
 export const DEFAULT_URL = process.env.BRAIN_EMBED_URL || process.env.ATLAS_EMBED_URL || "http://127.0.0.1:11445";
 export const DEFAULT_MODEL = process.env.BRAIN_EMBED_MODEL || process.env.ATLAS_EMBED_MODEL || "embeddinggemma:ane-w8a16";
 
-export type Kind = "source" | "jsonl" | "md" | "dyi";
+export type Kind = "source" | "jsonl" | "md" | "dyi" | "fbposts";
 
 /** source = already a source folder (server.sqlite: from `maw brain from` or `maw atlas download`). */
 export function detectKind(p: string): Kind | null {
@@ -19,6 +19,8 @@ export function detectKind(p: string): Kind | null {
   if (existsSync(join(p, "server.sqlite"))) return "source";
   for (const m of ["inbox", "messages/inbox", "your_facebook_activity/messages/inbox"])
     if (existsSync(join(p, m))) return "dyi";
+  for (const m of ["posts", "your_facebook_activity/posts", "comments_and_reactions", "your_facebook_activity/comments_and_reactions"])
+    if (existsSync(join(p, m))) return "fbposts";
   const hasMd = (d: string, depth: number): boolean => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
       if (e.isFile() && e.name.toLowerCase().endsWith(".md")) return true;
@@ -82,7 +84,7 @@ export function sourceCmd(rest: string[]): string[] {
 }
 
 export async function convert(kind: Exclude<Kind, "source">, input: string, out: string, args: string[], log: Log) {
-  const allow: Record<string, string[]> = { jsonl: ["name"], md: ["name", "group", "chars"], dyi: ["name", "since", "min-messages", "sources"] };
+  const allow: Record<string, string[]> = { jsonl: ["name"], md: ["name", "group", "chars"], dyi: ["name", "since", "min-messages", "sources"], fbposts: ["name", "since"] };
   const pass: string[] = [];
   for (const k of allow[kind]) { const v = flag(args, k); if (v !== undefined) pass.push(`--${k}`, v); }
   await runLive(sourceCmd([kind, resolve(input), resolve(out), ...pass]), log, "brain-source.py");

@@ -43,7 +43,7 @@ maw brain build commits.jsonl && maw brain serve commits.brain
 |---|---|
 | `build <input>... [--out=DIR]` | Turns the input into a source folder, then chunks, vectors (cached), UMAP 3D, 4 nearest links and topics. Several inputs make one map. |
 | `serve <brain dir> [--port] [--host]` | Serves the three.js page: search by meaning and by words, click a point to read it, Combined or Separate layout, the time machine, and lightning on replay. |
-| `from <jsonl\|md\|dyi> <input>` | Makes only the source folder (`server.json` + `server.sqlite`), so you can check it before building. |
+| `from <jsonl\|md\|dyi\|fbposts> <input>` | Makes only the source folder (`server.json` + `server.sqlite`), so you can check it before building. |
 | `insight <brain dir>` | Finds topics (HDBSCAN + c-TF-IDF, Thai words via PyThaiNLP) and the island layout. `build` already runs it. |
 | `reload [--port]` | Makes a running page re-read its folder after a rebuild. |
 | `check` | Checks for uv, python3 and the embed server, and prints the vector size. |
@@ -57,7 +57,10 @@ maw brain build commits.jsonl && maw brain serve commits.brain
 | JSONL | `*.jsonl` / `*.ndjson` | one line (`{"text", "ts"?, "group"?, "title"?, "author"?, "thread"?}`) | 0.0001 h (one point per row) |
 | Markdown | a folder with `*.md` (3 levels deep) | one section (a `#`–`####` heading starts one; code and images are dropped) | 0.0001 h |
 | Facebook export | `messages/inbox` (DYI, JSON format) | a stretch of conversation in one thread | 3 h of silence |
+| Facebook timeline | `posts/` or `comments_and_reactions/`, no `messages/inbox` | one post, group post or comment | 0.0001 h (one point each) |
 | Source folder | `server.sqlite` (`maw brain from`, or `maw atlas download`) | as above, or a Discord conversation | taken from `server.json`, else 3 h |
+
+A full DYI export (with Messenger too) detects as `dyi` — ask for your posts/comments explicitly with `--kind=fbposts`.
 
 How time is set for each input:
 
