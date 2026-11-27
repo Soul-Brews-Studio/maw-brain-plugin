@@ -174,16 +174,16 @@ def from_md(a):
     src = Source(a.out, a.name or root.name, "md", 0.0001)
     skip = {".git", "node_modules", ".venv", "dist", "build"}
     files = sorted(p for p in root.rglob("*.md") if not skip & set(p.relative_to(root).parts))
-    n = 0
+    last = {}   # room -> last time used: files committed together share t0, so sections must not interleave
     for f in files:
         rel = f.relative_to(root)
         key = str(rel) if a.group == "file" else (str(rel.parent) if rel.parent != Path(".") else root.name)
         text = f.read_text(errors="ignore")
-        t0 = first_commit(f) or front_date(text) or f.stat().st_mtime
+        t = max(first_commit(f) or front_date(text) or f.stat().st_mtime, last.get(key, -1) + 1)
         room = src.room(key, key)
-        for i, (h, body) in enumerate(sections(text, a.chars)):
-            src.add(room, t0 + i, f"{h}\n{body}" if h else body, f.stem, True)
-            n += 1
+        for h, body in sections(text, a.chars):
+            src.add(room, t, f"{h}\n{body}" if h else body, f.stem, True)
+            last[key], t = t, t + 1
     src.close()
     print(f"{len(files):,} markdown files")
 

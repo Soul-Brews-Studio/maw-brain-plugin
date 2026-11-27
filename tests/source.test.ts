@@ -63,6 +63,19 @@ describe("markdown folder", () => {
     const intro = r.msgs.find(m => m.content.startsWith("Intro"));
     expect(intro.ts).toStartWith("2025-05-05");
   });
+  test("files with the same time keep their sections in file order (no interleaving)", () => {
+    const same = join(root, "same");
+    mkdirSync(same, { recursive: true });
+    const body = (n: string) => `# ${n}\n${n} section text that is long enough to be kept as a point.\n`;
+    writeFileSync(join(same, "01-a.md"), "---\ndate: 2025-01-01\n---\n" + body("a1") + body("a2"));
+    writeFileSync(join(same, "02-b.md"), "---\ndate: 2025-01-01\n---\n" + body("b1"));
+    const out = join(root, "same.source");
+    expect(py(["md", same, out]).exitCode).toBe(0);
+    const r = rows(out);
+    const byTime = [...r.msgs].sort((x, y) => x.ts.localeCompare(y.ts)).map(m => m.content.split("\n")[0]);
+    expect(byTime).toEqual(["a1", "a2", "b1"]);
+    expect(new Set(r.msgs.map(m => m.ts)).size).toBe(3);
+  });
   test("--group file: one room per file", () => {
     const out = join(root, "lib-file.source");
     expect(py(["md", md, out, "--group", "file"]).exitCode).toBe(0);
