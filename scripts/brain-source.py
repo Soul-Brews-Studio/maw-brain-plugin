@@ -176,7 +176,9 @@ def from_md(a):
     root = Path(a.input).expanduser().resolve()
     src = Source(a.out, a.name or root.name, "md", 0.0001)
     skip = {".git", ".brain", "node_modules", ".venv", "dist", "build", "wt"} | {x.strip() for x in a.exclude.split(",") if x.strip()}
-    files = sorted(p for p in root.rglob("*.md") if not skip & set(p.relative_to(root).parts))
+    # hidden folders (.build, .venv, .cache ...) hold vendored docs, not your notes: skipped like node_modules
+    files = sorted(p for p in root.rglob("*.md")
+                   if not skip & set(p.relative_to(root).parts) and not any(x.startswith(".") for x in p.relative_to(root).parts[:-1]))
     last = {}   # room -> last time used: files committed together share t0, so sections must not interleave
     for f in files:
         rel = f.relative_to(root)

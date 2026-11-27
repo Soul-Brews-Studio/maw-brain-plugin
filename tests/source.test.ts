@@ -47,6 +47,8 @@ describe("markdown folder", () => {
   const md = join(root, "lib");
   mkdirSync(join(md, "book-a"), { recursive: true });
   mkdirSync(join(md, "node_modules", "x"), { recursive: true });
+  mkdirSync(join(md, ".build", "checkouts"), { recursive: true });
+  writeFileSync(join(md, ".build", "checkouts", "DOC.md"), "# vendored\nDocumentation of a dependency, long enough to be a point if it were read.\n");
   writeFileSync(join(md, "book-a", "01-intro.md"), "---\ndate: 2025-05-05\n---\n# Intro\nThis section is long enough to keep, forty characters at least.\n```\ncode is dropped\n```\n![img](x.png)\n## Two\nshort\n## Three\nAnother section that is long enough to be one point on the map.\n");
   writeFileSync(join(md, "top.md"), "Root file without heading but long enough to count as a section here.\n");
   writeFileSync(join(md, "node_modules", "x", "README.md"), "# skipped\nnode_modules is never read, even when it is long enough.\n");
@@ -60,6 +62,7 @@ describe("markdown folder", () => {
     expect(text).not.toContain("code is dropped");
     expect(text).not.toContain("img");
     expect(text).not.toContain("node_modules");
+    expect(text).not.toContain("vendored");
     const intro = r.msgs.find(m => m.content.startsWith("Intro"));
     expect(intro.ts).toStartWith("2025-05-05");
   });
