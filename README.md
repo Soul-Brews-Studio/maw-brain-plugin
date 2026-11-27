@@ -108,7 +108,7 @@ Needs [uv](https://docs.astral.sh/uv/), which brings Python 3.12, numpy, umap-le
 
 - One point is one chunk, not one message. Short messages on their own sort by script (Thai vs Latin) rather than by meaning, which is why chat is merged into conversations.
 - How the map is made: EmbeddingGemma with the document prompt `title: none | text: `, the first 256 Matryoshka dims renormalised, then UMAP 3D (cosine, 15 neighbours, min_dist 0.15, seed 7).
-- The engine (`scripts/brain-engine.py`) and the page and server (`lib/brain*.ts`, `lib/brain.html`) are vendored from [nat-build-with-oracle/maw-atlas](https://github.com/nat-build-with-oracle/maw-atlas) `maw atlas brain` at `536313bf` (MIT). maw-atlas stays the place for Discord: `maw atlas download`, then `maw brain build <guild folder>`.
+- The engine (`scripts/brain-engine.py`) and the page and server (`lib/brain*.ts`, `lib/brain.html`) are vendored from [nat-build-with-oracle/maw-atlas](https://github.com/nat-build-with-oracle/maw-atlas) `maw atlas brain` at `e1cfae6` (time machine ⏮ start and ▶ replay) (MIT). maw-atlas stays the place for Discord: `maw atlas download`, then `maw brain build <guild folder>`.
 - `serve` also answers `GET /brain/api/overview`, `/topics`, `/report.md` and `/ontology` (Apache Ossie YAML), which are handy as LLM context.
 
 ## Development
