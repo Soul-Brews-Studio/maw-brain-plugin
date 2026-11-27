@@ -8,7 +8,7 @@ export const meta: CommandMeta = {
   help: "build <input>... [--out=DIR]   JSONL file, markdown folder, Facebook export or source folder -> brain folder",
   treeLines: [
     "build <input>... [--out=DIR]   chunks -> vectors (cached) -> UMAP 3D -> 4 nearest links -> topics; several inputs = one map (--out required)",
-    "input kind is detected: *.jsonl, a folder with server.sqlite, a Facebook export (messages/inbox), a folder of *.md; force with --kind=",
+    "input kind is detected: *.jsonl, a folder with server.sqlite, a Facebook export (messages/inbox, or posts/comments_and_reactions for fbposts), a folder of *.md; force with --kind=",
     "--gap=H (from the source: 0.0001 for documents = one point each, 3 for chat) --chars=1200 --min-chars=40",
     `--url=URL --model=M   embed server, Ollama-style /api/embed (default ${DEFAULT_URL} ${DEFAULT_MODEL})`,
   ],
